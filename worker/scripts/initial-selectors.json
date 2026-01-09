@@ -1,0 +1,150 @@
+{
+  "version": "1.0.0",
+  "updatedAt": "2025-01-09T00:00:00Z",
+  "selectors": {
+    "composer": {
+      "textArea": {
+        "primary": "[data-testid=\"tweetTextarea_0\"]",
+        "fallback": [
+          "[role=\"textbox\"][aria-label=\"Post text\"]",
+          "div[contenteditable=\"true\"].public-DraftEditor-content"
+        ]
+      },
+      "textAreaLabel": {
+        "primary": "[data-testid=\"tweetTextarea_0_label\"]",
+        "fallback": []
+      },
+      "textAreaContainer": {
+        "primary": "[data-testid=\"tweetTextarea_0RichTextInputContainer\"]",
+        "fallback": []
+      },
+      "postButtonInline": {
+        "primary": "[data-testid=\"tweetButtonInline\"]",
+        "fallback": []
+      },
+      "postButtonModal": {
+        "primary": "[data-testid=\"tweetButton\"]",
+        "fallback": []
+      },
+      "toolbar": {
+        "primary": "[data-testid=\"toolBar\"]",
+        "fallback": []
+      }
+    },
+    "media": {
+      "fileInput": {
+        "primary": "[data-testid=\"fileInput\"]",
+        "fallback": [
+          "input[type=\"file\"][accept*=\"image\"]"
+        ]
+      },
+      "addMediaButton": {
+        "primary": "[aria-label=\"Add photos or video\"]",
+        "fallback": []
+      },
+      "gifButton": {
+        "primary": "[data-testid=\"gifSearchButton\"]",
+        "fallback": [
+          "[aria-label=\"Add a GIF\"]"
+        ]
+      }
+    },
+    "options": {
+      "pollButton": {
+        "primary": "[data-testid=\"createPollButton\"]",
+        "fallback": [
+          "[aria-label=\"Add poll\"]"
+        ]
+      },
+      "emojiButton": {
+        "primary": "[aria-label=\"Add emoji\"]",
+        "fallback": []
+      },
+      "scheduleButton": {
+        "primary": "[data-testid=\"scheduleOption\"]",
+        "fallback": [
+          "[aria-label=\"Schedule post\"]"
+        ]
+      },
+      "locationButton": {
+        "primary": "[data-testid=\"geoButton\"]",
+        "fallback": [
+          "[aria-label=\"Tag location\"]"
+        ]
+      },
+      "grokButton": {
+        "primary": "[data-testid=\"grokImgGen\"]",
+        "fallback": [
+          "[aria-label=\"Enhance your post with Grok\"]"
+        ]
+      },
+      "replySettings": {
+        "primary": "[aria-label=\"Everyone can reply\"]",
+        "fallback": []
+      }
+    },
+    "modal": {
+      "closeButton": {
+        "primary": "[data-testid=\"app-bar-close\"]",
+        "fallback": [
+          "button[aria-label=\"Close\"]"
+        ]
+      },
+      "draftsButton": {
+        "primary": "[data-testid=\"unsentButton\"]",
+        "fallback": []
+      },
+      "mask": {
+        "primary": "[data-testid=\"mask\"]",
+        "fallback": []
+      },
+      "progressBar": {
+        "primary": "[data-testid=\"progressBar-bar\"]",
+        "fallback": []
+      }
+    },
+    "navigation": {
+      "newTweetButton": {
+        "primary": "[data-testid=\"SideNav_NewTweet_Button\"]",
+        "fallback": [
+          "a[href=\"/compose/post\"]"
+        ]
+      },
+      "primaryColumn": {
+        "primary": "[data-testid=\"primaryColumn\"]",
+        "fallback": []
+      },
+      "accountSwitcher": {
+        "primary": "[data-testid=\"SideNav_AccountSwitcher_Button\"]",
+        "fallback": []
+      }
+    },
+    "confirmation": {
+      "tweet": {
+        "primary": "[data-testid=\"tweet\"]",
+        "fallback": [
+          "article[role=\"article\"]"
+        ]
+      },
+      "tweetText": {
+        "primary": "[data-testid=\"tweetText\"]",
+        "fallback": []
+      },
+      "tweetPhoto": {
+        "primary": "[data-testid=\"tweetPhoto\"]",
+        "fallback": []
+      }
+    },
+    "interaction": {
+      "replyButton": {
+        "primary": "[data-testid=\"reply\"]",
+        "fallback": []
+      },
+      "retweetButton": {
+        "primary": "[data-testid=\"retweet\"]",
+        "fallback": []
+      }
+    }
+  },
+  "healingHistory": []
+}
