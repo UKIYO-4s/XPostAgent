@@ -1,7 +1,7 @@
-# X (Twitter) DOM セレクタ仕様書 v2
+# X (Twitter) DOM セレクタ仕様書 v2.1
 
 **作成日**: 2025-01-10
-**バージョン**: 2.0.0
+**バージョン**: 2.1.0
 
 ---
 
@@ -97,7 +97,30 @@ addButton.click();  // 2. クリック
 | スケジュール | `[data-testid="scheduleOption"]` | `[aria-label="Schedule post"]` |
 | 位置情報 | `[data-testid="geoButton"]` | `[aria-label="Tag location"]` |
 
-### 2.4 確認・通知
+### 2.4 アンケート (Poll) UI
+
+| 要素 | セレクタ | 備考 |
+|------|---------|------|
+| Pollボタン | `[data-testid="createPollButton"]` | Poll UI 起動 |
+| 選択肢1入力 | `input[name="Choice1"]` | 必須 |
+| 選択肢2入力 | `input[name="Choice2"]` | 必須 |
+| 選択肢3入力 | `input[name="Choice3"]` | 任意（追加後に出現） |
+| 選択肢4入力 | `input[name="Choice4"]` | 任意（追加後に出現） |
+| 選択肢追加ボタン | `[data-testid="addPollChoice"]` | aria-label="Add a choice" |
+| Poll削除ボタン | `[data-testid="removePollButton"]` | Poll UI 削除 |
+| 期間: Days | `[data-testid="selectPollDays"]` | select要素 (0-7) |
+| 期間: Hours | `[data-testid="selectPollHours"]` | select要素 (0-23) |
+| 期間: Minutes | `[data-testid="selectPollMinutes"]` | select要素 (0-59) |
+
+### 2.5 絵文字ピッカー (Emoji) UI
+
+| 要素 | セレクタ | 備考 |
+|------|---------|------|
+| 絵文字ボタン | `[aria-label="Add emoji"]` | Picker 起動 |
+| 検索入力 | `input[placeholder="Search emojis"]` | 絵文字検索 |
+| 絵文字ボタン | `button[aria-label="..."]` | 各絵文字（例: "Waving hand"） |
+
+### 2.6 確認・通知
 
 | 要素 | プライマリセレクタ | フォールバック |
 |------|-------------------|---------------|
@@ -171,7 +194,7 @@ async function activateAndInputText(textArea, text) {
 
 ```json
 {
-  "version": "2.0.0",
+  "version": "2.1.0",
   "updatedAt": "2025-01-10T00:00:00Z",
   "selectors": {
     "composer": {
@@ -201,6 +224,46 @@ async function activateAndInputText(textArea, text) {
       "fileInput": {
         "primary": "[data-testid=\"fileInput\"]",
         "fallback": ["input[type=\"file\"]"]
+      }
+    },
+    "poll": {
+      "createButton": {
+        "primary": "[data-testid=\"createPollButton\"]",
+        "fallback": ["[aria-label=\"Add poll\"]"]
+      },
+      "choiceInputs": {
+        "pattern": "input[name=\"Choice{index}\"]",
+        "note": "index is 1-based (Choice1, Choice2, Choice3, Choice4)"
+      },
+      "addChoiceButton": {
+        "primary": "[data-testid=\"addPollChoice\"]",
+        "fallback": ["[aria-label=\"Add a choice\"]"]
+      },
+      "removeButton": {
+        "primary": "[data-testid=\"removePollButton\"]",
+        "fallback": []
+      },
+      "durationDays": {
+        "primary": "[data-testid=\"selectPollDays\"]",
+        "fallback": []
+      },
+      "durationHours": {
+        "primary": "[data-testid=\"selectPollHours\"]",
+        "fallback": []
+      },
+      "durationMinutes": {
+        "primary": "[data-testid=\"selectPollMinutes\"]",
+        "fallback": []
+      }
+    },
+    "emoji": {
+      "openButton": {
+        "primary": "[aria-label=\"Add emoji\"]",
+        "fallback": []
+      },
+      "searchInput": {
+        "primary": "input[placeholder=\"Search emojis\"]",
+        "fallback": []
       }
     },
     "confirmation": {
@@ -255,3 +318,4 @@ async function activateAndInputText(textArea, text) {
 | 日付 | バージョン | 変更内容 |
 |------|-----------|----------|
 | 2025-01-10 | 2.0.0 | 新規作成。セレクタベース操作を明確化 |
+| 2025-01-10 | 2.1.0 | Poll UI、Emoji UI セレクタ追加。KVデータ構造更新 |
