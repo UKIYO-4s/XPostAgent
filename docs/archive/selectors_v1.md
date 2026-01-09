@@ -2,7 +2,7 @@
 
 **調査日**: 2025-01-09
 **対象URL**: https://x.com/home
-**バージョン**: 1.0.0
+**バージョン**: 1.1.0
 
 ---
 
@@ -19,11 +19,14 @@ X の UI 変更に対応するため、セルフヒーリング機能と連携�
 
 | 要素 | セレクタ (優先順) | 説明 |
 |------|------------------|------|
-| テキストエリア | `[data-testid="tweetTextarea_0"]` | 投稿文入力欄 |
+| テキストエリア | `[data-testid="tweetTextarea_0"]` | 投稿文入力欄（1件目） |
+| テキストエリア (N件目) | `[data-testid="tweetTextarea_{N}"]` | スレッド用テキストエリア（0始まり） |
 | テキストエリアラベル | `[data-testid="tweetTextarea_0_label"]` | 入力欄のラベル |
 | テキストエリアコンテナ | `[data-testid="tweetTextarea_0RichTextInputContainer"]` | リッチテキスト入力コンテナ |
 | 投稿ボタン (インライン) | `[data-testid="tweetButtonInline"]` | ホーム画面の投稿ボタン |
-| 投稿ボタン (モーダル) | `[data-testid="tweetButton"]` | モーダル内の投稿ボタン |
+| 投稿ボタン (モーダル) | `[data-testid="tweetButton"]` | モーダル内の投稿ボタン（スレッド時は"Post all"） |
+| スレッド追加ボタン | `[data-testid="addButton"]` | テキスト入力後に表示される「+」ボタン |
+| スレッド削除ボタン | `[aria-label="Remove post"]` | スレッドから投稿を削除 |
 | ツールバー | `[data-testid="toolBar"]` | ボタン群の親要素 |
 
 ### 2.2 メディア・添付
@@ -92,13 +95,14 @@ Cloudflare KV に保存する形式:
 
 ```json
 {
-  "version": "1.0.0",
-  "updatedAt": "2025-01-09T00:00:00Z",
+  "version": "1.1.0",
+  "updatedAt": "2025-01-10T00:00:00Z",
   "selectors": {
     "composer": {
       "textArea": {
         "primary": "[data-testid=\"tweetTextarea_0\"]",
-        "fallback": ["[role=\"textbox\"][aria-label=\"Post text\"]", "div[contenteditable=\"true\"].public-DraftEditor-content"]
+        "fallback": ["[role=\"textbox\"][aria-label=\"Post text\"]", "div[contenteditable=\"true\"].public-DraftEditor-content"],
+        "pattern": "[data-testid=\"tweetTextarea_{index}\"]"
       },
       "postButtonInline": {
         "primary": "[data-testid=\"tweetButtonInline\"]",
@@ -106,6 +110,14 @@ Cloudflare KV に保存する形式:
       },
       "postButtonModal": {
         "primary": "[data-testid=\"tweetButton\"]",
+        "fallback": []
+      },
+      "addThreadButton": {
+        "primary": "[data-testid=\"addButton\"]",
+        "fallback": ["[aria-label=\"Add post\"]"]
+      },
+      "removeThreadButton": {
+        "primary": "[aria-label=\"Remove post\"]",
         "fallback": []
       },
       "toolbar": {
@@ -281,9 +293,11 @@ async function waitForElement(selectorDef, timeout = 5000) {
 - 選択肢: Everyone / Accounts you follow / Verified accounts / Only people you mention
 
 ### 6.5 ツリー投稿（スレッド）
-- テキスト入力後に「+」ボタンが表示される
-- 現時点で専用の `data-testid` は確認できず
-- 投稿ボタン横のUI変化で検出する必要あり
+- テキスト入力後に「+」ボタン（`[data-testid="addButton"]`）が表示される
+- クリックすると新しいテキストエリアが追加される
+- 各テキストエリアは `tweetTextarea_0`, `tweetTextarea_1`, ... のインデックス付きIDを持つ
+- スレッド時、投稿ボタンのテキストは "Post all" に変わる
+- 追加したスレッドは `[aria-label="Remove post"]` ボタンで削除可能
 
 ---
 
@@ -292,3 +306,4 @@ async function waitForElement(selectorDef, timeout = 5000) {
 | 日付 | バージョン | 変更内容 |
 |------|-----------|----------|
 | 2025-01-09 | 1.0.0 | 初版作成 |
+| 2025-01-10 | 1.1.0 | スレッド投稿セレクタ追加 (addThreadButton, removeThreadButton, textArea.pattern) |

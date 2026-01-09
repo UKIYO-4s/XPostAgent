@@ -34,6 +34,12 @@ function handleMessage(message, sender, sendResponse) {
         .catch(error => sendResponse({ success: false, error: error.message }));
       return true; // 非同期レスポンス
 
+    case 'EXECUTE_THREAD_POST':
+      executeThreadPost(message.payload)
+        .then(sendResponse)
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true; // 非同期レスポンス
+
     case 'GET_DOM_STRUCTURE':
       sendResponse(getDOMStructure());
       return false;
@@ -48,9 +54,9 @@ function handleMessage(message, sender, sendResponse) {
  * 投稿実行
  */
 async function executePost(payload) {
-  const { text, audience, selectors } = payload;
+  const { text, audience, selectors, mediaFiles } = payload;
 
-  Logger.info('Content', '投稿実行開始', { textLength: text.length, audience });
+  Logger.info('Content', '投稿実行開始', { textLength: text.length, audience, hasMedia: !!mediaFiles?.length });
 
   const failedSelectors = [];
 
@@ -69,21 +75,35 @@ async function executePost(payload) {
     // 3. 少し待機（UIの更新を待つ）
     await sleep(500);
 
-    // 4. 投稿ボタンを取得
+    // 4. 公開範囲を設定（デフォルト以外の場合）
+    if (audience && audience !== 'everyone') {
+      await setAudience(audience);
+      Logger.info('Content', '公開範囲設定完了', { audience });
+      await sleep(300);
+    }
+
+    // 5. メディアファイルを添付（ある場合）
+    if (mediaFiles && mediaFiles.length > 0) {
+      await attachMedia(mediaFiles, selectors);
+      Logger.info('Content', 'メディア添付完了', { count: mediaFiles.length });
+      await sleep(500);
+    }
+
+    // 6. 投稿ボタンを取得
     const postButtonDef = selectors.composer?.postButtonInline || selectors.composer?.postButtonModal;
     const postButton = await findElement(postButtonDef, 'postButton', failedSelectors);
     if (!postButton) {
       return { success: false, error: '投稿ボタンが見つかりません', failedSelectors };
     }
 
-    // 5. 投稿ボタンが有効になるまで待機
+    // 7. 投稿ボタンが有効になるまで待機
     await waitForButtonEnabled(postButton);
 
-    // 6. 投稿ボタンをクリック
+    // 8. 投稿ボタンをクリック
     postButton.click();
     Logger.info('Content', '投稿ボタンクリック', {});
 
-    // 7. 投稿完了を待機
+    // 9. 投稿完了を待機
     await waitForPostComplete();
     Logger.info('Content', '投稿完了', {});
 
@@ -97,6 +117,349 @@ async function executePost(payload) {
       failedSelectors: failedSelectors.length > 0 ? failedSelectors : undefined,
     };
   }
+}
+
+/**
+ * ツリー投稿実行
+ */
+async function executeThreadPost(payload) {
+  const { threadTexts, audience, selectors, mediaFiles } = payload;
+
+  Logger.info('Content', 'ツリー投稿実行開始', { count: threadTexts.length });
+
+  try {
+    let posted = 0;
+
+    for (let i = 0; i < threadTexts.length; i++) {
+      const text = threadTexts[i];
+      if (!text.trim()) continue;
+
+      Logger.info('Content', `ツリー ${i + 1}/${threadTexts.length} 投稿開始`, { length: text.length });
+
+      // テキストエリアを取得（i番目のツイート用）
+      // 注意: Xは複数のtextareaを作成するため、i番目のものを取得する必要がある
+      const textArea = await findThreadTextArea(i, selectors);
+      if (!textArea) {
+        throw new Error(`テキストエリアが見つかりません (${i + 1}件目)`);
+      }
+
+      // テキストを入力
+      await inputText(textArea, text);
+      await sleep(300);
+
+      // 最初の投稿のみ: 公開範囲を設定
+      if (i === 0 && audience && audience !== 'everyone') {
+        await setAudience(audience);
+        await sleep(300);
+      }
+
+      // 最初の投稿のみ: メディアを添付
+      if (i === 0 && mediaFiles && mediaFiles.length > 0) {
+        await attachMedia(mediaFiles, selectors);
+        await sleep(500);
+      }
+
+      // 最後の投稿でなければ「+」ボタンをクリックして次の入力欄を追加
+      if (i < threadTexts.length - 1) {
+        const addButtonClicked = await clickAddThreadButton(selectors);
+        if (!addButtonClicked) {
+          Logger.warn('Content', 'ツリー追加ボタンが見つかりません、投稿を実行', {});
+        }
+        await sleep(500);
+      }
+
+      posted++;
+    }
+
+    // 投稿ボタンをクリック（"Post all"ボタンを探す）
+    const postButton = await findPostAllButton(selectors);
+    if (!postButton) {
+      throw new Error('投稿ボタンが見つかりません');
+    }
+
+    await waitForButtonEnabled(postButton);
+    postButton.click();
+    Logger.info('Content', '投稿ボタンクリック', {});
+
+    // 投稿完了を待機
+    await waitForPostComplete();
+    Logger.info('Content', 'ツリー投稿完了', { posted });
+
+    return { success: true, posted };
+
+  } catch (error) {
+    Logger.error('Content', 'ツリー投稿失敗', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * ツリー投稿用のi番目のテキストエリアを取得
+ * KVセレクタ: composer.textArea.pattern
+ * Xは各ツイートに tweetTextarea_0, tweetTextarea_1, ... のように
+ * インデックス付きのdata-testidを使用する
+ *
+ * 重要: モーダル内で検索 (仕様書: docs/dom-selectors.md 1.4 参照)
+ */
+async function findThreadTextArea(index, selectors, timeout = 5000) {
+  const startTime = Date.now();
+
+  // パターンからインデックス付きセレクタを生成
+  const pattern = selectors?.composer?.textArea?.pattern || '[data-testid="tweetTextarea_{index}"]';
+  const indexedSelector = pattern.replace('{index}', index);
+
+  // モーダル内で検索
+  const modal = document.querySelector('[role="dialog"]');
+  const searchContext = modal || document;
+
+  while (Date.now() - startTime < timeout) {
+    const textArea = searchContext.querySelector(indexedSelector);
+
+    if (textArea) {
+      Logger.debug('Content', `ツリー用テキストエリア取得`, { index, selector: indexedSelector, inModal: !!modal });
+      return textArea;
+    }
+
+    await sleep(100);
+  }
+
+  Logger.error('Content', `ツリー用テキストエリアが見つかりません`, { index, selector: indexedSelector });
+  return null;
+}
+
+/**
+ * Post all ボタンを取得（ツリー投稿用）
+ * KVセレクタ: composer.postButton (v2.0.0) スレッド時は "Post all" テキスト
+ *
+ * 重要: モーダル内で検索 (仕様書: docs/dom-selectors.md 1.4 参照)
+ */
+async function findPostAllButton(selectors, timeout = 5000) {
+  const startTime = Date.now();
+  const postButtonDef = selectors?.composer?.postButton || {
+    primary: '[data-testid="tweetButton"]',
+    fallback: []
+  };
+
+  // モーダル内で検索
+  const modal = document.querySelector('[role="dialog"]');
+  const searchContext = modal || document;
+
+  while (Date.now() - startTime < timeout) {
+    // プライマリセレクタで検索
+    let btn = searchContext.querySelector(postButtonDef.primary);
+    if (btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
+      Logger.debug('Content', 'Post allボタン発見 (primary)', {
+        text: btn.textContent,
+        selector: postButtonDef.primary,
+        inModal: !!modal
+      });
+      return btn;
+    }
+
+    // フォールバックで検索
+    for (const fallback of postButtonDef.fallback || []) {
+      btn = searchContext.querySelector(fallback);
+      if (btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true') {
+        Logger.debug('Content', 'Post allボタン発見 (fallback)', {
+          text: btn.textContent,
+          selector: fallback,
+          inModal: !!modal
+        });
+        return btn;
+      }
+    }
+
+    await sleep(100);
+  }
+
+  Logger.error('Content', 'Post allボタンが見つかりません', { selectorDef: postButtonDef });
+  return null;
+}
+
+/**
+ * ツリー追加ボタンをクリック
+ * KVセレクタ: composer.addButton (v2.0.0)
+ *
+ * 重要: モーダル内で検索し、focus() → click() の順序で実行
+ * (仕様書: docs/dom-selectors.md 1.4, 1.5 参照)
+ */
+async function clickAddThreadButton(selectors) {
+  const addBtnDef = selectors?.composer?.addButton || {
+    primary: '[data-testid="addButton"]',
+    fallback: ['[aria-label="Add post"]']
+  };
+
+  // モーダル内で検索（モーダル外に同一セレクタの要素が存在するため）
+  const modal = document.querySelector('[role="dialog"]');
+  const searchContext = modal || document;
+
+  // プライマリセレクタで検索
+  let btn = searchContext.querySelector(addBtnDef.primary);
+  if (btn) {
+    btn.focus();  // focus() を先に実行
+    await sleep(100);
+    btn.click();
+    Logger.debug('Content', 'ツリー追加ボタンクリック (primary)', { selector: addBtnDef.primary, inModal: !!modal });
+    return true;
+  }
+
+  // フォールバックで検索
+  for (const fallback of addBtnDef.fallback || []) {
+    btn = searchContext.querySelector(fallback);
+    if (btn) {
+      btn.focus();
+      await sleep(100);
+      btn.click();
+      Logger.debug('Content', 'ツリー追加ボタンクリック (fallback)', { selector: fallback, inModal: !!modal });
+      return true;
+    }
+  }
+
+  // 少し待機して再度試す
+  await sleep(300);
+
+  btn = searchContext.querySelector(addBtnDef.primary);
+  if (btn) {
+    btn.focus();
+    await sleep(100);
+    btn.click();
+    return true;
+  }
+
+  Logger.warn('Content', 'ツリー追加ボタンが見つかりません', { selectorDef: addBtnDef, hasModal: !!modal });
+  return false;
+}
+
+/**
+ * 公開範囲を設定
+ */
+async function setAudience(audience) {
+  // 公開範囲ボタンを探す（現在の設定に関わらず）
+  const audienceSelectors = [
+    '[aria-label="Everyone can reply"]',
+    '[aria-label="Accounts you follow can reply"]',
+    '[aria-label="Only people you mention can reply"]',
+    '[aria-label="Verified accounts can reply"]',
+  ];
+
+  let audienceBtn = null;
+  for (const selector of audienceSelectors) {
+    audienceBtn = document.querySelector(selector);
+    if (audienceBtn) break;
+  }
+
+  if (!audienceBtn) {
+    Logger.warn('Content', '公開範囲ボタンが見つかりません', {});
+    return; // スキップ（投稿は続行）
+  }
+
+  // ドロップダウンを開く
+  audienceBtn.click();
+  await sleep(300);
+
+  // オプションのテキストマッピング
+  const audienceTextMap = {
+    'everyone': 'Everyone',
+    'following': 'Accounts you follow',
+    'verified': 'Verified accounts',
+    'mentioned': 'Only accounts you mention',
+  };
+
+  const targetText = audienceTextMap[audience];
+  if (!targetText) {
+    Logger.warn('Content', '不明な公開範囲オプション', { audience });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    return;
+  }
+
+  // メニューアイテムを探してクリック
+  const menuItems = document.querySelectorAll('[role="menuitem"]');
+  let found = false;
+
+  for (const item of menuItems) {
+    if (item.textContent?.trim() === targetText) {
+      item.click();
+      found = true;
+      Logger.debug('Content', '公開範囲選択', { selected: targetText });
+      break;
+    }
+  }
+
+  if (!found) {
+    Logger.warn('Content', '公開範囲オプションが見つかりません', { targetText });
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  }
+
+  await sleep(200);
+}
+
+/**
+ * メディアファイルを添付
+ */
+async function attachMedia(mediaFiles, selectors) {
+  const fileInputDef = selectors.media?.fileInput;
+  if (!fileInputDef) {
+    throw new Error('ファイル入力セレクタが定義されていません');
+  }
+
+  const fileInput = document.querySelector(fileInputDef.primary);
+  if (!fileInput) {
+    // フォールバックを試す
+    for (const fallback of fileInputDef.fallback || []) {
+      const el = document.querySelector(fallback);
+      if (el) {
+        await uploadFilesToInput(el, mediaFiles);
+        return;
+      }
+    }
+    throw new Error('ファイル入力要素が見つかりません');
+  }
+
+  await uploadFilesToInput(fileInput, mediaFiles);
+}
+
+/**
+ * ファイルをinput要素にアップロード
+ */
+async function uploadFilesToInput(fileInput, mediaFiles) {
+  // Base64からFileオブジェクトを作成
+  const files = await Promise.all(mediaFiles.map(async (media, index) => {
+    const response = await fetch(media.dataUrl);
+    const blob = await response.blob();
+    return new File([blob], media.name || `image_${index}.${media.type.split('/')[1]}`, { type: media.type });
+  }));
+
+  // DataTransferを使ってファイルを設定
+  const dataTransfer = new DataTransfer();
+  files.forEach(file => dataTransfer.items.add(file));
+  fileInput.files = dataTransfer.files;
+
+  // changeイベントを発火
+  fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+  // アップロード完了を待機（プレビュー表示の確認）
+  await waitForMediaPreview();
+}
+
+/**
+ * メディアプレビューの表示を待機
+ */
+async function waitForMediaPreview(timeout = 10000) {
+  const startTime = Date.now();
+
+  while (Date.now() - startTime < timeout) {
+    // プレビュー要素または添付完了インジケータを探す
+    const preview = document.querySelector('[data-testid="attachments"]') ||
+                    document.querySelector('[data-testid="tweetPhoto"]') ||
+                    document.querySelector('img[src*="blob:"]');
+    if (preview) {
+      return true;
+    }
+    await sleep(200);
+  }
+
+  Logger.warn('Content', 'メディアプレビュー待機タイムアウト', {});
+  return true; // タイムアウトでも続行
 }
 
 /**
@@ -139,13 +502,20 @@ async function findElement(selectorDef, name, failedSelectors, timeout = 5000) {
 /**
  * テキスト入力
  * Draft.jsエディタ対応
+ *
+ * 重要: React状態を有効化するため、click() → focus() → InputEvent の順序が必須
+ * (仕様書: docs/dom-selectors.md 参照)
  */
 async function inputText(textArea, text) {
-  // フォーカス
+  // 1. クリックでReact状態を有効化（これが必須）
+  textArea.click();
+  await sleep(100);
+
+  // 2. フォーカス
   textArea.focus();
   await sleep(100);
 
-  // Draft.jsエディタの場合
+  // 3. Draft.jsエディタの場合
   if (textArea.getAttribute('contenteditable') === 'true') {
     // InputEventを使用
     const inputEvent = new InputEvent('beforeinput', {
@@ -156,13 +526,12 @@ async function inputText(textArea, text) {
     });
     textArea.dispatchEvent(inputEvent);
 
-    // テキストを直接設定（フォールバック）
+    // フォールバック: execCommandを試す
     if (!textArea.textContent.includes(text)) {
-      // execCommandを試す
       document.execCommand('insertText', false, text);
     }
 
-    // それでもダメならtextContentを直接設定
+    // 最終フォールバック: textContentを直接設定
     if (!textArea.textContent.includes(text)) {
       textArea.textContent = text;
       textArea.dispatchEvent(new Event('input', { bubbles: true }));
@@ -172,6 +541,9 @@ async function inputText(textArea, text) {
     textArea.value = text;
     textArea.dispatchEvent(new Event('input', { bubbles: true }));
   }
+
+  // 4. React状態反映待機
+  await sleep(300);
 
   Logger.debug('Content', 'テキスト入力処理完了', { textContent: textArea.textContent?.slice(0, 50) });
 }
