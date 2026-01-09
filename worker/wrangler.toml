@@ -9,12 +9,9 @@ port = 8787
 local_protocol = "http"
 
 # KV Namespace バインディング
-# デプロイ前に実際のIDに置き換えてください
-# 作成コマンド: wrangler kv:namespace create "SELECTORS"
 [[kv_namespaces]]
 binding = "SELECTORS"
-id = "YOUR_KV_NAMESPACE_ID"
-preview_id = "YOUR_PREVIEW_KV_NAMESPACE_ID"
+id = "47f7b0893343475db560e3a1dbcfc7b0"
 
 # AI バインディング (セルフヒーリング用)
 [ai]
