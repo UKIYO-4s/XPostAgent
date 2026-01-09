@@ -73,7 +73,9 @@ extension/
 ├── content/
 │   └── content.js         # X上でのDOM操作
 ├── lib/
-│   └── api.js             # Cloudflare Worker通信
+│   ├── api.js             # Cloudflare Worker通信
+│   ├── logger.js          # 統一ログユーティリティ
+│   └── selectors.js       # セレクタ管理ヘルパー
 └── icons/
     ├── icon16.png
     ├── icon48.png
@@ -124,6 +126,7 @@ extension/
 POST /api/selectors/get      # 現在のセレクタ定義を取得
 POST /api/selectors/validate # DOM構造の差分チェック
 POST /api/selectors/heal     # セルフヒーリング実行
+POST /api/selectors/update   # セレクタ定義の更新（管理用）
 GET  /api/health             # ヘルスチェック
 ```
 

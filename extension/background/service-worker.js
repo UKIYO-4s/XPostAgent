@@ -5,12 +5,12 @@
 
 const API_BASE_URL = 'https://xpostagent-worker.menu-simulator.workers.dev';
 
-// ログユーティリティ
+// ログユーティリティ（設計書準拠）
 const Logger = {
-  info: (action, data) => console.log(`[XPostAgent][INFO][Background] ${action}`, data),
-  warn: (action, data) => console.warn(`[XPostAgent][WARN][Background] ${action}`, data),
-  error: (action, data) => console.error(`[XPostAgent][ERROR][Background] ${action}`, data),
-  debug: (action, data) => console.log(`[XPostAgent][DEBUG][Background] ${action}`, data),
+  info: (component, action, data = {}) => console.log(`[XPostAgent][INFO][${component}] ${action}`, data),
+  warn: (component, action, data = {}) => console.warn(`[XPostAgent][WARN][${component}] ${action}`, data),
+  error: (component, action, data = {}) => console.error(`[XPostAgent][ERROR][${component}] ${action}`, data),
+  debug: (component, action, data = {}) => console.log(`[XPostAgent][DEBUG][${component}] ${action}`, data),
 };
 
 // 状態管理
@@ -23,12 +23,12 @@ const state = {
  * 初期化
  */
 async function init() {
-  Logger.info('初期化開始', {});
+  Logger.info('Background', '初期化開始', {});
 
   // セレクタを取得してキャッシュ
   await fetchAndCacheSelectors();
 
-  Logger.info('初期化完了', { version: state.selectorsVersion });
+  Logger.info('Background', '初期化完了', { version: state.selectorsVersion });
 }
 
 /**
@@ -47,12 +47,12 @@ async function fetchAndCacheSelectors() {
     if (data.success) {
       state.selectors = data.selectors;
       state.selectorsVersion = data.version;
-      Logger.info('セレクタ取得成功', { version: data.version });
+      Logger.info('Background', 'セレクタ取得成功', { version: data.version });
     } else {
       throw new Error(data.error || 'Failed to get selectors');
     }
   } catch (error) {
-    Logger.error('セレクタ取得失敗', { error: error.message });
+    Logger.error('Background', 'セレクタ取得失敗', { error: error.message });
   }
 }
 
@@ -60,7 +60,7 @@ async function fetchAndCacheSelectors() {
  * メッセージハンドラ
  */
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  Logger.debug('メッセージ受信', { type: message.type, sender: sender.tab?.id });
+  Logger.debug('Background', 'メッセージ受信', { type: message.type, sender: sender.tab?.id });
 
   // 非同期処理のためtrueを返す
   handleMessage(message, sender).then(sendResponse);
@@ -86,7 +86,7 @@ async function handleMessage(message, sender) {
       return await handleSelectorFailure(message.payload);
 
     default:
-      Logger.warn('未知のメッセージタイプ', { type: message.type });
+      Logger.warn('Background', '未知のメッセージタイプ', { type: message.type });
       return { success: false, error: 'Unknown message type' };
   }
 }
@@ -95,7 +95,7 @@ async function handleMessage(message, sender) {
  * 投稿リクエスト処理
  */
 async function handlePostRequest(payload, sender) {
-  Logger.info('投稿リクエスト', { textLength: payload.text.length });
+  Logger.info('Background', '投稿リクエスト', { textLength: payload.text.length });
 
   try {
     // 現在のタブを取得
@@ -126,19 +126,19 @@ async function handlePostRequest(payload, sender) {
     });
 
     if (response.success) {
-      Logger.info('投稿成功', {});
+      Logger.info('Background', '投稿成功', {});
       return { success: true };
     } else {
       // セレクタ失敗の場合はセルフヒーリングを試みる
       if (response.failedSelectors && response.failedSelectors.length > 0) {
-        Logger.warn('セレクタ失敗、ヒーリング開始', { failed: response.failedSelectors });
+        Logger.warn('Background', 'セレクタ失敗、ヒーリング開始', { failed: response.failedSelectors });
         return await attemptHealing(tab.id, payload, response.failedSelectors);
       }
       throw new Error(response.error || '投稿に失敗しました');
     }
 
   } catch (error) {
-    Logger.error('投稿処理失敗', { error: error.message });
+    Logger.error('Background', '投稿処理失敗', { error: error.message });
     return { success: false, error: error.message };
   }
 }
@@ -147,7 +147,7 @@ async function handlePostRequest(payload, sender) {
  * セルフヒーリング試行
  */
 async function attemptHealing(tabId, payload, failedSelectors) {
-  Logger.info('セルフヒーリング開始', { failedSelectors });
+  Logger.info('Background', 'セルフヒーリング開始', { failedSelectors });
 
   try {
     // Content ScriptからDOM構造を取得
@@ -176,7 +176,7 @@ async function attemptHealing(tabId, payload, failedSelectors) {
       state.selectors = { ...state.selectors, ...healData.newSelectors };
       state.selectorsVersion = healData.version;
 
-      Logger.info('ヒーリング成功、リトライ', { newVersion: healData.version });
+      Logger.info('Background', 'ヒーリング成功、リトライ', { newVersion: healData.version });
 
       // 再度投稿を試みる
       const retryResponse = await chrome.tabs.sendMessage(tabId, {
@@ -194,7 +194,7 @@ async function attemptHealing(tabId, payload, failedSelectors) {
     }
 
   } catch (error) {
-    Logger.error('セルフヒーリング失敗', { error: error.message });
+    Logger.error('Background', 'セルフヒーリング失敗', { error: error.message });
     return { success: false, error: `ヒーリング失敗: ${error.message}` };
   }
 }
@@ -203,7 +203,7 @@ async function attemptHealing(tabId, payload, failedSelectors) {
  * セレクタ失敗報告処理
  */
 async function handleSelectorFailure(payload) {
-  Logger.warn('セレクタ失敗報告', payload);
+  Logger.warn('Background', 'セレクタ失敗報告', payload);
 
   // 今後の分析用にログを記録
   // 必要に応じてWorkerに報告することも可能
@@ -215,7 +215,7 @@ async function handleSelectorFailure(payload) {
  * インストール時の処理
  */
 chrome.runtime.onInstalled.addListener((details) => {
-  Logger.info('拡張機能インストール', { reason: details.reason });
+  Logger.info('Background', '拡張機能インストール', { reason: details.reason });
   init();
 });
 
@@ -223,7 +223,7 @@ chrome.runtime.onInstalled.addListener((details) => {
  * 起動時の処理
  */
 chrome.runtime.onStartup.addListener(() => {
-  Logger.info('拡張機能起動', {});
+  Logger.info('Background', '拡張機能起動', {});
   init();
 });
 

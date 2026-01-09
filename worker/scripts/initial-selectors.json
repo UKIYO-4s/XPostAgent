@@ -120,6 +120,10 @@
       }
     },
     "confirmation": {
+      "toast": {
+        "primary": "[data-testid=\"toast\"]",
+        "fallback": []
+      },
       "tweet": {
         "primary": "[data-testid=\"tweet\"]",
         "fallback": [

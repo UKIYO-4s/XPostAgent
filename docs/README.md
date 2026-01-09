@@ -21,7 +21,8 @@ docs/
 ├── architecture.md        # アーキテクチャ設計書
 ├── functional-spec.md     # 機能仕様書
 ├── selectors.md           # DOM セレクタ定義書
-└── LESSONS_LEARNED.md     # 実装ノート・注意事項
+├── LESSONS_LEARNED.md     # 実装ノート・注意事項
+└── CONSISTENCY_REPORT.md  # 仕様・実装 整合性レポート
 ```
 
 ---
@@ -35,6 +36,7 @@ docs/
 | 機能仕様書 | [functional-spec.md](./functional-spec.md) | 各機能の詳細仕様、処理フロー | 完了 |
 | セレクタ定義書 | [selectors.md](./selectors.md) | X の DOM セレクタ一覧、取得方法 | 完了 |
 | 実装ノート | [LESSONS_LEARNED.md](./LESSONS_LEARNED.md) | 問題点・注意事項・ベストプラクティス | 完了 |
+| 整合性レポート | [CONSISTENCY_REPORT.md](./CONSISTENCY_REPORT.md) | 仕様と実装の整合性検証結果 | 完了 |
 
 ---
 
@@ -99,7 +101,7 @@ docs/
 | Phase | 内容 | ステータス |
 |-------|------|-----------|
 | Phase 0 | 設計・仕様策定 | **完了** |
-| Phase 1 | Chrome 拡張機能の骨格、基本投稿機能 | 未着手 |
+| Phase 1 | Chrome 拡張機能の骨格、基本投稿機能 | **完了**（整合性検証済み） |
 | Phase 2 | メディア添付、公開範囲、ツリー投稿 | 未着手 |
 | Phase 3 | Cloudflare Worker、セルフヒーリング | **完了**（デプロイ済み） |
 | Phase 4 | テスト、安定化、ドキュメント整備 | 進行中 |
@@ -173,3 +175,5 @@ XPostAgent/
 |------|----------|
 | 2025-01-09 | 初版作成（全ドキュメント） |
 | 2025-01-09 | Cloudflare Worker デプロイ完了、LESSONS_LEARNED.md 追加 |
+| 2025-01-09 | Chrome 拡張機能 Phase 1 実装完了 |
+| 2025-01-09 | 仕様・実装 整合性検証完了、CONSISTENCY_REPORT.md 追加 |

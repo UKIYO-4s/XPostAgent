@@ -72,6 +72,7 @@ image/jpeg, image/png, image/webp, image/gif, video/mp4, video/quicktime
 
 | 要素 | セレクタ | 説明 |
 |------|---------|------|
+| Toast通知 | `[data-testid="toast"]` | 投稿完了通知 |
 | 投稿アイテム | `[data-testid="tweet"]` | 投稿されたツイート |
 | 投稿テキスト | `[data-testid="tweetText"]` | ツイート本文 |
 | 投稿画像 | `[data-testid="tweetPhoto"]` | ツイート添付画像 |
@@ -181,6 +182,10 @@ Cloudflare KV に保存する形式:
       }
     },
     "confirmation": {
+      "toast": {
+        "primary": "[data-testid=\"toast\"]",
+        "fallback": []
+      },
       "tweet": {
         "primary": "[data-testid=\"tweet\"]",
         "fallback": ["article[role=\"article\"]"]
