@@ -36,11 +36,18 @@
         </div>
       </div>
 
+      <!-- メディアプレビュー -->
+      <div class="media-preview" id="mediaPreview" style="display: none;">
+        <div class="media-list" id="mediaList"></div>
+        <button type="button" class="media-clear-btn" id="btnClearMedia">クリア</button>
+      </div>
+
       <!-- オプションボタン -->
       <div class="options-bar">
         <button type="button" class="option-btn" id="btnMedia" title="画像を追加">
           <span class="icon">📷</span>
         </button>
+        <input type="file" id="mediaInput" accept="image/jpeg,image/png,image/webp,image/gif" multiple style="display: none;">
         <button type="button" class="option-btn" id="btnGif" title="GIFを追加">
           <span class="icon">GIF</span>
         </button>
@@ -66,8 +73,9 @@
         </select>
       </div>
 
-      <!-- ツリー追加 -->
+      <!-- ツリー投稿 -->
       <div class="thread-section" id="threadSection">
+        <div class="thread-list" id="threadList"></div>
         <button type="button" class="thread-btn" id="btnAddThread">
           <span class="icon">+</span> ツリーを追加
         </button>

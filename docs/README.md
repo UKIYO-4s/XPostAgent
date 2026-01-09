@@ -1,7 +1,7 @@
 # XPostAgent ドキュメント一覧
 
-**最終更新**: 2025-01-09
-**プロジェクトステータス**: Cloudflare Worker デプロイ完了
+**最終更新**: 2025-01-10
+**プロジェクトステータス**: Phase 1 機能テスト完了
 
 ---
 
@@ -20,9 +20,12 @@ docs/
 ├── requirements.md        # 要件定義書
 ├── architecture.md        # アーキテクチャ設計書
 ├── functional-spec.md     # 機能仕様書
-├── selectors.md           # DOM セレクタ定義書
+├── dom-selectors.md       # DOM セレクタ仕様書 v2
 ├── LESSONS_LEARNED.md     # 実装ノート・注意事項
-└── CONSISTENCY_REPORT.md  # 仕様・実装 整合性レポート
+├── CONSISTENCY_REPORT.md  # 仕様・実装 整合性レポート
+├── TEST_RESULTS.md        # 機能テスト結果
+└── archive/               # 旧バージョンドキュメント
+    └── selectors_v1.md    # 旧セレクタ定義書
 ```
 
 ---
@@ -34,9 +37,10 @@ docs/
 | 要件定義書 | [requirements.md](./requirements.md) | プロジェクト目的、機能要件、非機能要件 | 完了 |
 | アーキテクチャ設計書 | [architecture.md](./architecture.md) | システム構成、データフロー、技術スタック | 完了 |
 | 機能仕様書 | [functional-spec.md](./functional-spec.md) | 各機能の詳細仕様、処理フロー | 完了 |
-| セレクタ定義書 | [selectors.md](./selectors.md) | X の DOM セレクタ一覧、取得方法 | 完了 |
+| セレクタ仕様書 v2 | [dom-selectors.md](./dom-selectors.md) | X の DOM セレクタ一覧、操作フロー | 完了 |
 | 実装ノート | [LESSONS_LEARNED.md](./LESSONS_LEARNED.md) | 問題点・注意事項・ベストプラクティス | 完了 |
 | 整合性レポート | [CONSISTENCY_REPORT.md](./CONSISTENCY_REPORT.md) | 仕様と実装の整合性検証結果 | 完了 |
+| テスト結果 | [TEST_RESULTS.md](./TEST_RESULTS.md) | F-001〜F-004 機能テスト結果 | 完了 |
 
 ---
 
@@ -80,19 +84,20 @@ docs/
 - UI 仕様・レイアウト
 - エラーケース一覧
 
-### 4. セレクタ定義書 (selectors.md)
+### 4. セレクタ仕様書 v2 (dom-selectors.md)
 
-- DOM セレクタ一覧（7カテゴリ）
+- 基本原則
+  - セレクタベース操作の徹底
+  - React/Draft.js 対応手順
+  - モーダル内要素のスコープ限定
+- DOM セレクタ一覧
   - 投稿コンポーザー
   - メディア・添付
   - 投稿オプション
-  - モーダル専用
-  - ナビゲーション
-  - 投稿完了検知
-  - インタラクション
-- JSON 形式セレクタ定義（KV 保存用）
-- ヘルパー関数
-- 注意事項（Draft.js、ファイルアップロード等）
+  - 確認・通知
+- 操作フロー（単一投稿・スレッド投稿）
+- KV データ構造
+- 重要な注意事項
 
 ---
 
@@ -101,10 +106,10 @@ docs/
 | Phase | 内容 | ステータス |
 |-------|------|-----------|
 | Phase 0 | 設計・仕様策定 | **完了** |
-| Phase 1 | Chrome 拡張機能の骨格、基本投稿機能 | **完了**（整合性検証済み） |
-| Phase 2 | メディア添付、公開範囲、ツリー投稿 | 未着手 |
+| Phase 1 | Chrome 拡張機能の骨格、基本投稿機能 | **完了**（テスト済み） |
+| Phase 2 | メディア添付、公開範囲、ツリー投稿 | **完了**（テスト済み） |
 | Phase 3 | Cloudflare Worker、セルフヒーリング | **完了**（デプロイ済み） |
-| Phase 4 | テスト、安定化、ドキュメント整備 | 進行中 |
+| Phase 4 | テスト、安定化、ドキュメント整備 | **完了**（F-001〜F-004テスト済み） |
 
 ### デプロイ済み環境
 
@@ -177,3 +182,5 @@ XPostAgent/
 | 2025-01-09 | Cloudflare Worker デプロイ完了、LESSONS_LEARNED.md 追加 |
 | 2025-01-09 | Chrome 拡張機能 Phase 1 実装完了 |
 | 2025-01-09 | 仕様・実装 整合性検証完了、CONSISTENCY_REPORT.md 追加 |
+| 2025-01-10 | dom-selectors.md v2.0.0 作成、旧 selectors.md を archive へ移動 |
+| 2025-01-10 | F-001〜F-004 機能テスト完了、TEST_RESULTS.md 追加 |

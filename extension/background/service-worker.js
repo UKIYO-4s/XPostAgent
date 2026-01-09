@@ -75,6 +75,9 @@ async function handleMessage(message, sender) {
     case 'POST_REQUEST':
       return await handlePostRequest(message.payload, sender);
 
+    case 'THREAD_POST_REQUEST':
+      return await handleThreadPostRequest(message.payload, sender);
+
     case 'GET_SELECTORS':
       return {
         success: true,
@@ -95,7 +98,10 @@ async function handleMessage(message, sender) {
  * 投稿リクエスト処理
  */
 async function handlePostRequest(payload, sender) {
-  Logger.info('Background', '投稿リクエスト', { textLength: payload.text.length });
+  Logger.info('Background', '投稿リクエスト', {
+    textLength: payload.text?.length || 0,
+    mediaCount: payload.mediaFiles?.length || 0
+  });
 
   try {
     // 現在のタブを取得
@@ -121,6 +127,7 @@ async function handlePostRequest(payload, sender) {
       payload: {
         text: payload.text,
         audience: payload.audience,
+        mediaFiles: payload.mediaFiles,
         selectors: state.selectors,
       },
     });
@@ -139,6 +146,56 @@ async function handlePostRequest(payload, sender) {
 
   } catch (error) {
     Logger.error('Background', '投稿処理失敗', { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * ツリー投稿リクエスト処理
+ */
+async function handleThreadPostRequest(payload, sender) {
+  Logger.info('Background', 'ツリー投稿リクエスト', {
+    threadCount: payload.threadTexts?.length || 0
+  });
+
+  try {
+    // 現在のタブを取得
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab) {
+      throw new Error('アクティブなタブがありません');
+    }
+
+    // Xのページかチェック
+    if (!tab.url.includes('x.com') && !tab.url.includes('twitter.com')) {
+      throw new Error('Xのページを開いてください');
+    }
+
+    // セレクタが未取得なら取得
+    if (!state.selectors) {
+      await fetchAndCacheSelectors();
+    }
+
+    // Content Scriptにツリー投稿を実行させる
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'EXECUTE_THREAD_POST',
+      payload: {
+        threadTexts: payload.threadTexts,
+        audience: payload.audience,
+        mediaFiles: payload.mediaFiles,
+        selectors: state.selectors,
+      },
+    });
+
+    if (response.success) {
+      Logger.info('Background', 'ツリー投稿成功', { posted: response.posted });
+      return { success: true };
+    } else {
+      throw new Error(response.error || 'ツリー投稿に失敗しました');
+    }
+
+  } catch (error) {
+    Logger.error('Background', 'ツリー投稿処理失敗', { error: error.message });
     return { success: false, error: error.message };
   }
 }
@@ -184,6 +241,7 @@ async function attemptHealing(tabId, payload, failedSelectors) {
         payload: {
           text: payload.text,
           audience: payload.audience,
+          mediaFiles: payload.mediaFiles,
           selectors: state.selectors,
         },
       });
