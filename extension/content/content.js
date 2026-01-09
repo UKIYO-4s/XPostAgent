@@ -661,20 +661,20 @@ async function executePostWithPoll(payload) {
     }
 
     // 2. アンケートボタンをクリック
+    // セレクタ: [data-testid="createPollButton"]
     const modal = document.querySelector('[role="dialog"]');
     const searchContext = modal || document;
 
-    const pollBtn = searchContext.querySelector('[data-testid="createPollButton"]') ||
-                   searchContext.querySelector('[aria-label="Add poll"]');
-
+    const pollBtn = searchContext.querySelector('[data-testid="createPollButton"]');
     if (!pollBtn) {
-      throw new Error('アンケートボタンが見つかりません');
+      throw new Error('アンケートボタンが見つかりません ([data-testid="createPollButton"])');
     }
 
     pollBtn.focus();
     await sleep(100);
     pollBtn.click();
-    await sleep(500);
+    Logger.debug('Content', 'Pollボタンクリック');
+    await sleep(600);
 
     // 3. アンケート選択肢を入力
     if (pollOptions && pollOptions.length >= 2) {
@@ -716,131 +716,79 @@ async function executePostWithPoll(payload) {
 
 /**
  * アンケート選択肢を入力
- * DOM構造: モーダル内の input[type="text"] 要素が選択肢入力欄
- * "Add a choice" ボタンで3つ目以降を追加
+ * セレクタ: input[name="Choice1"], input[name="Choice2"], ...
+ * 追加ボタン: [data-testid="addPollChoice"]
  */
 async function fillPollOptions(options, context) {
-  // モーダル内の全てのテキスト入力を取得（Poll UI内のもの）
-  // Poll UIはダイアログ内にあり、Choice入力はinput[type="text"]
-  let inputs = Array.from(context.querySelectorAll('input[type="text"]'));
-
-  // テキストエリア（投稿本文）を除外するためフィルタリング
-  // Poll選択肢のinputは通常、投稿テキストエリアより後に表示される
-  inputs = inputs.filter(input => {
-    // data-testidがtweetで始まるものは除外
-    const testId = input.getAttribute('data-testid') || '';
-    if (testId.startsWith('tweet')) return false;
-    // 検索欄を除外
-    const placeholder = input.getAttribute('placeholder') || '';
-    if (placeholder.includes('Search')) return false;
-    return true;
-  });
-
-  Logger.debug('Content', 'アンケート入力欄発見', { count: inputs.length });
+  Logger.debug('Content', 'アンケート選択肢入力開始', { count: options.length });
 
   for (let i = 0; i < options.length && i < 4; i++) {
-    if (i < inputs.length) {
-      // 既存の入力欄に入力
-      const input = inputs[i];
+    const choiceName = `Choice${i + 1}`;
+    let input = context.querySelector(`input[name="${choiceName}"]`);
+
+    // 3つ目以降は追加ボタンで作成が必要
+    if (!input && i >= 2) {
+      const addBtn = context.querySelector('[data-testid="addPollChoice"]');
+      if (addBtn) {
+        addBtn.click();
+        await sleep(400);
+        input = context.querySelector(`input[name="${choiceName}"]`);
+      }
+    }
+
+    if (input) {
       input.focus();
       await sleep(100);
-
-      // 値をクリアしてから入力
       input.value = '';
       input.value = options[i];
       input.dispatchEvent(new Event('input', { bubbles: true }));
       input.dispatchEvent(new Event('change', { bubbles: true }));
+      Logger.debug('Content', `Choice${i + 1}入力完了`, { value: options[i] });
       await sleep(200);
-    } else if (i >= 2) {
-      // 3つ目以降は「Add a choice」ボタンで追加
-      const addChoiceBtn = Array.from(context.querySelectorAll('button')).find(btn =>
-        btn.textContent?.includes('Add a choice') ||
-        btn.getAttribute('aria-label')?.includes('Add')
-      );
-
-      if (addChoiceBtn) {
-        addChoiceBtn.click();
-        await sleep(400);
-
-        // 新しく追加された入力欄を取得
-        const newInputs = Array.from(context.querySelectorAll('input[type="text"]')).filter(input => {
-          const testId = input.getAttribute('data-testid') || '';
-          const placeholder = input.getAttribute('placeholder') || '';
-          return !testId.startsWith('tweet') && !placeholder.includes('Search');
-        });
-
-        if (newInputs[i]) {
-          newInputs[i].focus();
-          await sleep(100);
-          newInputs[i].value = options[i];
-          newInputs[i].dispatchEvent(new Event('input', { bubbles: true }));
-          newInputs[i].dispatchEvent(new Event('change', { bubbles: true }));
-        }
-      }
-      await sleep(200);
+    } else {
+      Logger.warn('Content', `Choice${i + 1}入力欄が見つかりません`);
     }
   }
 }
 
 /**
  * アンケート期間を設定
- * DOM構造: combobox要素（カスタムドロップダウン）で Days/Hours/Minutes
- * 順番: 1番目=Days, 2番目=Hours, 3番目=Minutes
+ * セレクタ:
+ *   Days: [data-testid="selectPollDays"]
+ *   Hours: [data-testid="selectPollHours"]
+ *   Minutes: [data-testid="selectPollMinutes"]
  */
 async function setPollLength(pollLength, context) {
   const { days = 1, hours = 0, minutes = 0 } = pollLength;
 
-  // すべてのselect要素またはcombobox role要素を取得
-  const selects = context.querySelectorAll('select, [role="combobox"]');
-  Logger.debug('Content', 'ドロップダウン発見', { count: selects.length });
-
-  if (selects.length >= 3) {
-    // 1番目: Days
-    await setDropdownValue(selects[0], days);
-    await sleep(150);
-
-    // 2番目: Hours
-    await setDropdownValue(selects[1], hours);
-    await sleep(150);
-
-    // 3番目: Minutes
-    await setDropdownValue(selects[2], minutes);
-    await sleep(150);
+  // Days
+  const daysSelect = context.querySelector('[data-testid="selectPollDays"]');
+  if (daysSelect) {
+    daysSelect.value = String(days);
+    daysSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    Logger.debug('Content', 'Days設定', { days });
   }
+  await sleep(100);
 
-  Logger.debug('Content', 'アンケート期間設定', { days, hours, minutes });
-}
-
-/**
- * ドロップダウンの値を設定
- */
-async function setDropdownValue(element, value) {
-  if (!element) return;
-
-  // 標準のselect要素の場合
-  if (element.tagName === 'SELECT') {
-    element.value = String(value);
-    element.dispatchEvent(new Event('change', { bubbles: true }));
-    return;
+  // Hours
+  const hoursSelect = context.querySelector('[data-testid="selectPollHours"]');
+  if (hoursSelect) {
+    hoursSelect.value = String(hours);
+    hoursSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    Logger.debug('Content', 'Hours設定', { hours });
   }
+  await sleep(100);
 
-  // カスタムcomboboxの場合
-  // クリックしてドロップダウンを開く
-  element.click();
-  await sleep(200);
-
-  // オプションを探してクリック
-  const options = document.querySelectorAll('[role="option"], [role="listbox"] > *');
-  for (const option of options) {
-    if (option.textContent?.trim() === String(value)) {
-      option.click();
-      await sleep(100);
-      return;
-    }
+  // Minutes
+  const minutesSelect = context.querySelector('[data-testid="selectPollMinutes"]');
+  if (minutesSelect) {
+    minutesSelect.value = String(minutes);
+    minutesSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    Logger.debug('Content', 'Minutes設定', { minutes });
   }
+  await sleep(100);
 
-  // 見つからない場合はEscapeで閉じる
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  Logger.debug('Content', 'アンケート期間設定完了', { days, hours, minutes });
 }
 
 /**
