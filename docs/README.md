@@ -1,7 +1,7 @@
 # XPostAgent ドキュメント一覧
 
 **最終更新**: 2025-01-09
-**プロジェクトステータス**: 設計完了 → 実装準備
+**プロジェクトステータス**: Cloudflare Worker デプロイ完了
 
 ---
 
@@ -20,7 +20,8 @@ docs/
 ├── requirements.md        # 要件定義書
 ├── architecture.md        # アーキテクチャ設計書
 ├── functional-spec.md     # 機能仕様書
-└── selectors.md           # DOM セレクタ定義書
+├── selectors.md           # DOM セレクタ定義書
+└── LESSONS_LEARNED.md     # 実装ノート・注意事項
 ```
 
 ---
@@ -33,6 +34,7 @@ docs/
 | アーキテクチャ設計書 | [architecture.md](./architecture.md) | システム構成、データフロー、技術スタック | 完了 |
 | 機能仕様書 | [functional-spec.md](./functional-spec.md) | 各機能の詳細仕様、処理フロー | 完了 |
 | セレクタ定義書 | [selectors.md](./selectors.md) | X の DOM セレクタ一覧、取得方法 | 完了 |
+| 実装ノート | [LESSONS_LEARNED.md](./LESSONS_LEARNED.md) | 問題点・注意事項・ベストプラクティス | 完了 |
 
 ---
 
@@ -99,8 +101,15 @@ docs/
 | Phase 0 | 設計・仕様策定 | **完了** |
 | Phase 1 | Chrome 拡張機能の骨格、基本投稿機能 | 未着手 |
 | Phase 2 | メディア添付、公開範囲、ツリー投稿 | 未着手 |
-| Phase 3 | Cloudflare Worker、セルフヒーリング | 未着手 |
-| Phase 4 | テスト、安定化、ドキュメント整備 | 未着手 |
+| Phase 3 | Cloudflare Worker、セルフヒーリング | **完了**（デプロイ済み） |
+| Phase 4 | テスト、安定化、ドキュメント整備 | 進行中 |
+
+### デプロイ済み環境
+
+| 項目 | 値 |
+|------|-----|
+| Worker URL | https://xpostagent-worker.menu-simulator.workers.dev |
+| KV Namespace | `47f7b0893343475db560e3a1dbcfc7b0` |
 
 ---
 
@@ -163,3 +172,4 @@ XPostAgent/
 | 日付 | 変更内容 |
 |------|----------|
 | 2025-01-09 | 初版作成（全ドキュメント） |
+| 2025-01-09 | Cloudflare Worker デプロイ完了、LESSONS_LEARNED.md 追加 |
