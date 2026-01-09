@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=400">
+  <title>XPostAgent</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <!-- ヘッダー -->
+    <header class="header">
+      <h1 class="title">XPostAgent</h1>
+      <span class="version" id="version">v1.0.0</span>
+    </header>
+
+    <!-- ステータス表示 -->
+    <div class="status-bar" id="statusBar">
+      <span class="status-indicator" id="statusIndicator"></span>
+      <span class="status-text" id="statusText">接続確認中...</span>
+    </div>
+
+    <!-- メインコンテンツ -->
+    <main class="main">
+      <!-- テキスト入力 -->
+      <div class="input-group">
+        <textarea
+          id="postText"
+          class="post-input"
+          placeholder="いまどうしてる？"
+          maxlength="280"
+          rows="4"
+        ></textarea>
+        <div class="char-count">
+          <span id="charCount">0</span>/280
+        </div>
+      </div>
+
+      <!-- オプションボタン -->
+      <div class="options-bar">
+        <button type="button" class="option-btn" id="btnMedia" title="画像を追加">
+          <span class="icon">📷</span>
+        </button>
+        <button type="button" class="option-btn" id="btnGif" title="GIFを追加">
+          <span class="icon">GIF</span>
+        </button>
+        <button type="button" class="option-btn" id="btnPoll" title="アンケートを追加">
+          <span class="icon">📊</span>
+        </button>
+        <button type="button" class="option-btn" id="btnEmoji" title="絵文字を追加">
+          <span class="icon">😊</span>
+        </button>
+        <button type="button" class="option-btn" id="btnSchedule" title="予約投稿">
+          <span class="icon">📅</span>
+        </button>
+      </div>
+
+      <!-- 公開範囲 -->
+      <div class="audience-section">
+        <label class="label">公開範囲:</label>
+        <select id="audience" class="select">
+          <option value="everyone">全員が返信可能</option>
+          <option value="following">フォロー中のみ</option>
+          <option value="verified">認証済みのみ</option>
+          <option value="mentioned">メンションのみ</option>
+        </select>
+      </div>
+
+      <!-- ツリー追加 -->
+      <div class="thread-section" id="threadSection">
+        <button type="button" class="thread-btn" id="btnAddThread">
+          <span class="icon">+</span> ツリーを追加
+        </button>
+      </div>
+
+      <!-- 投稿ボタン -->
+      <button type="button" class="post-btn" id="btnPost" disabled>
+        投稿する
+      </button>
+    </main>
+
+    <!-- フッターステータス -->
+    <footer class="footer">
+      <div class="connection-status">
+        <span class="dot" id="connectionDot"></span>
+        <span id="connectionText">Worker: 確認中</span>
+      </div>
+    </footer>
+  </div>
+
+  <script src="../lib/logger.js"></script>
+  <script src="../lib/api.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
