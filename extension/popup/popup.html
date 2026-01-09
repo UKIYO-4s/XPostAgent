@@ -73,6 +73,64 @@
         </select>
       </div>
 
+      <!-- アンケート設定 -->
+      <div class="poll-section" id="pollSection" style="display: none;">
+        <div class="poll-header">
+          <span class="poll-title">アンケート</span>
+          <button type="button" class="poll-remove-btn" id="btnRemovePoll">削除</button>
+        </div>
+        <div class="poll-options">
+          <input type="text" class="poll-option-input" id="pollOption1" placeholder="選択肢 1" maxlength="25">
+          <input type="text" class="poll-option-input" id="pollOption2" placeholder="選択肢 2" maxlength="25">
+          <input type="text" class="poll-option-input" id="pollOption3" placeholder="選択肢 3 (任意)" maxlength="25">
+          <input type="text" class="poll-option-input" id="pollOption4" placeholder="選択肢 4 (任意)" maxlength="25">
+        </div>
+        <div class="poll-duration">
+          <label class="label">期間:</label>
+          <select id="pollDays" class="select-small">
+            <option value="1">1日</option>
+            <option value="2">2日</option>
+            <option value="3">3日</option>
+            <option value="4">4日</option>
+            <option value="5">5日</option>
+            <option value="6">6日</option>
+            <option value="7">7日</option>
+          </select>
+          <select id="pollHours" class="select-small">
+            <option value="0">0時間</option>
+            <option value="6">6時間</option>
+            <option value="12">12時間</option>
+            <option value="18">18時間</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 絵文字ピッカー -->
+      <div class="emoji-picker" id="emojiPicker" style="display: none;">
+        <div class="emoji-grid" id="emojiGrid">
+          <button type="button" class="emoji-btn" data-emoji="😀">😀</button>
+          <button type="button" class="emoji-btn" data-emoji="😂">😂</button>
+          <button type="button" class="emoji-btn" data-emoji="🥹">🥹</button>
+          <button type="button" class="emoji-btn" data-emoji="😊">😊</button>
+          <button type="button" class="emoji-btn" data-emoji="😍">😍</button>
+          <button type="button" class="emoji-btn" data-emoji="🤔">🤔</button>
+          <button type="button" class="emoji-btn" data-emoji="😢">😢</button>
+          <button type="button" class="emoji-btn" data-emoji="😎">😎</button>
+          <button type="button" class="emoji-btn" data-emoji="🔥">🔥</button>
+          <button type="button" class="emoji-btn" data-emoji="❤️">❤️</button>
+          <button type="button" class="emoji-btn" data-emoji="👍">👍</button>
+          <button type="button" class="emoji-btn" data-emoji="👎">👎</button>
+          <button type="button" class="emoji-btn" data-emoji="🎉">🎉</button>
+          <button type="button" class="emoji-btn" data-emoji="✨">✨</button>
+          <button type="button" class="emoji-btn" data-emoji="💪">💪</button>
+          <button type="button" class="emoji-btn" data-emoji="🙏">🙏</button>
+          <button type="button" class="emoji-btn" data-emoji="👀">👀</button>
+          <button type="button" class="emoji-btn" data-emoji="💡">💡</button>
+          <button type="button" class="emoji-btn" data-emoji="📢">📢</button>
+          <button type="button" class="emoji-btn" data-emoji="🚀">🚀</button>
+        </div>
+      </div>
+
       <!-- ツリー投稿 -->
       <div class="thread-section" id="threadSection">
         <div class="thread-list" id="threadList"></div>

@@ -44,6 +44,18 @@ function handleMessage(message, sender, sendResponse) {
       sendResponse(getDOMStructure());
       return false;
 
+    case 'EXECUTE_POST_WITH_POLL':
+      executePostWithPoll(message.payload)
+        .then(sendResponse)
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
+    case 'INSERT_EMOJI':
+      insertEmoji(message.payload)
+        .then(sendResponse)
+        .catch(error => sendResponse({ success: false, error: error.message }));
+      return true;
+
     default:
       sendResponse({ success: false, error: 'Unknown message type' });
       return false;
@@ -620,6 +632,311 @@ function getDOMStructure() {
  */
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * アンケート付き投稿を実行
+ * F-006: アンケート作成機能
+ */
+async function executePostWithPoll(payload) {
+  const { text, pollOptions, pollLength, audience, selectors } = payload;
+
+  Logger.info('Content', 'アンケート付き投稿実行開始', {
+    textLength: text?.length || 0,
+    optionCount: pollOptions?.length || 0
+  });
+
+  try {
+    // 1. テキストエリアを取得して入力
+    const textAreaDef = selectors?.composer?.textArea;
+    const textArea = await findElement(textAreaDef, 'textArea', []);
+    if (!textArea) {
+      throw new Error('テキストエリアが見つかりません');
+    }
+
+    // テキストを入力
+    if (text) {
+      await inputText(textArea, text);
+      await sleep(300);
+    }
+
+    // 2. アンケートボタンをクリック
+    const modal = document.querySelector('[role="dialog"]');
+    const searchContext = modal || document;
+
+    const pollBtn = searchContext.querySelector('[data-testid="createPollButton"]') ||
+                   searchContext.querySelector('[aria-label="Add poll"]');
+
+    if (!pollBtn) {
+      throw new Error('アンケートボタンが見つかりません');
+    }
+
+    pollBtn.focus();
+    await sleep(100);
+    pollBtn.click();
+    await sleep(500);
+
+    // 3. アンケート選択肢を入力
+    if (pollOptions && pollOptions.length >= 2) {
+      await fillPollOptions(pollOptions, searchContext);
+    }
+
+    // 4. アンケート期間を設定
+    if (pollLength) {
+      await setPollLength(pollLength, searchContext);
+    }
+
+    // 5. 公開範囲を設定
+    if (audience && audience !== 'everyone') {
+      await setAudience(audience);
+      await sleep(300);
+    }
+
+    // 6. 投稿ボタンをクリック
+    const postButton = await findPostAllButton(selectors);
+    if (!postButton) {
+      throw new Error('投稿ボタンが見つかりません');
+    }
+
+    await waitForButtonEnabled(postButton);
+    postButton.click();
+    Logger.info('Content', '投稿ボタンクリック', {});
+
+    // 7. 投稿完了を待機
+    await waitForPostComplete();
+    Logger.info('Content', 'アンケート付き投稿完了', {});
+
+    return { success: true };
+
+  } catch (error) {
+    Logger.error('Content', 'アンケート付き投稿失敗', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * アンケート選択肢を入力
+ * DOM構造: モーダル内の input[type="text"] 要素が選択肢入力欄
+ * "Add a choice" ボタンで3つ目以降を追加
+ */
+async function fillPollOptions(options, context) {
+  // モーダル内の全てのテキスト入力を取得（Poll UI内のもの）
+  // Poll UIはダイアログ内にあり、Choice入力はinput[type="text"]
+  let inputs = Array.from(context.querySelectorAll('input[type="text"]'));
+
+  // テキストエリア（投稿本文）を除外するためフィルタリング
+  // Poll選択肢のinputは通常、投稿テキストエリアより後に表示される
+  inputs = inputs.filter(input => {
+    // data-testidがtweetで始まるものは除外
+    const testId = input.getAttribute('data-testid') || '';
+    if (testId.startsWith('tweet')) return false;
+    // 検索欄を除外
+    const placeholder = input.getAttribute('placeholder') || '';
+    if (placeholder.includes('Search')) return false;
+    return true;
+  });
+
+  Logger.debug('Content', 'アンケート入力欄発見', { count: inputs.length });
+
+  for (let i = 0; i < options.length && i < 4; i++) {
+    if (i < inputs.length) {
+      // 既存の入力欄に入力
+      const input = inputs[i];
+      input.focus();
+      await sleep(100);
+
+      // 値をクリアしてから入力
+      input.value = '';
+      input.value = options[i];
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await sleep(200);
+    } else if (i >= 2) {
+      // 3つ目以降は「Add a choice」ボタンで追加
+      const addChoiceBtn = Array.from(context.querySelectorAll('button')).find(btn =>
+        btn.textContent?.includes('Add a choice') ||
+        btn.getAttribute('aria-label')?.includes('Add')
+      );
+
+      if (addChoiceBtn) {
+        addChoiceBtn.click();
+        await sleep(400);
+
+        // 新しく追加された入力欄を取得
+        const newInputs = Array.from(context.querySelectorAll('input[type="text"]')).filter(input => {
+          const testId = input.getAttribute('data-testid') || '';
+          const placeholder = input.getAttribute('placeholder') || '';
+          return !testId.startsWith('tweet') && !placeholder.includes('Search');
+        });
+
+        if (newInputs[i]) {
+          newInputs[i].focus();
+          await sleep(100);
+          newInputs[i].value = options[i];
+          newInputs[i].dispatchEvent(new Event('input', { bubbles: true }));
+          newInputs[i].dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      }
+      await sleep(200);
+    }
+  }
+}
+
+/**
+ * アンケート期間を設定
+ * DOM構造: combobox要素（カスタムドロップダウン）で Days/Hours/Minutes
+ * 順番: 1番目=Days, 2番目=Hours, 3番目=Minutes
+ */
+async function setPollLength(pollLength, context) {
+  const { days = 1, hours = 0, minutes = 0 } = pollLength;
+
+  // すべてのselect要素またはcombobox role要素を取得
+  const selects = context.querySelectorAll('select, [role="combobox"]');
+  Logger.debug('Content', 'ドロップダウン発見', { count: selects.length });
+
+  if (selects.length >= 3) {
+    // 1番目: Days
+    await setDropdownValue(selects[0], days);
+    await sleep(150);
+
+    // 2番目: Hours
+    await setDropdownValue(selects[1], hours);
+    await sleep(150);
+
+    // 3番目: Minutes
+    await setDropdownValue(selects[2], minutes);
+    await sleep(150);
+  }
+
+  Logger.debug('Content', 'アンケート期間設定', { days, hours, minutes });
+}
+
+/**
+ * ドロップダウンの値を設定
+ */
+async function setDropdownValue(element, value) {
+  if (!element) return;
+
+  // 標準のselect要素の場合
+  if (element.tagName === 'SELECT') {
+    element.value = String(value);
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+    return;
+  }
+
+  // カスタムcomboboxの場合
+  // クリックしてドロップダウンを開く
+  element.click();
+  await sleep(200);
+
+  // オプションを探してクリック
+  const options = document.querySelectorAll('[role="option"], [role="listbox"] > *');
+  for (const option of options) {
+    if (option.textContent?.trim() === String(value)) {
+      option.click();
+      await sleep(100);
+      return;
+    }
+  }
+
+  // 見つからない場合はEscapeで閉じる
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+}
+
+/**
+ * 絵文字を挿入
+ * F-007: 絵文字挿入機能
+ */
+async function insertEmoji(payload) {
+  const { emoji, selectors } = payload;
+
+  Logger.info('Content', '絵文字挿入', { emoji });
+
+  try {
+    // テキストエリアを取得
+    const modal = document.querySelector('[role="dialog"]');
+    const searchContext = modal || document;
+
+    const textArea = searchContext.querySelector('[data-testid="tweetTextarea_0"]') ||
+                    searchContext.querySelector('[role="textbox"]');
+
+    if (!textArea) {
+      throw new Error('テキストエリアが見つかりません');
+    }
+
+    // テキストエリアをアクティブにする
+    textArea.click();
+    await sleep(100);
+    textArea.focus();
+    await sleep(100);
+
+    // 絵文字を直接入力（絵文字ピッカーを開かずに直接挿入）
+    const inputEvent = new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: emoji,
+    });
+    textArea.dispatchEvent(inputEvent);
+
+    // フォールバック
+    if (!textArea.textContent?.includes(emoji)) {
+      document.execCommand('insertText', false, emoji);
+    }
+
+    await sleep(200);
+
+    Logger.info('Content', '絵文字挿入完了', { emoji });
+    return { success: true };
+
+  } catch (error) {
+    Logger.error('Content', '絵文字挿入失敗', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 絵文字ピッカーを開いて絵文字を選択
+ * （高度な絵文字挿入 - ピッカーUI使用）
+ * DOM構造: 検索入力は placeholder="Search emojis"
+ */
+async function openEmojiPickerAndSelect(emojiName, context) {
+  // 絵文字ボタンをクリック
+  const emojiBtn = context.querySelector('[aria-label="Add emoji"]');
+  if (!emojiBtn) {
+    throw new Error('絵文字ボタンが見つかりません');
+  }
+
+  emojiBtn.focus();
+  await sleep(100);
+  emojiBtn.click();
+  await sleep(500);
+
+  // 検索欄に入力 (placeholder="Search emojis")
+  const searchInput = document.querySelector('input[placeholder="Search emojis"], input[placeholder*="Search emoji"]');
+  if (searchInput && emojiName) {
+    searchInput.focus();
+    await sleep(100);
+    searchInput.value = emojiName;
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(400);
+
+    // 最初の検索結果をクリック（絵文字ボタン）
+    const emojiButtons = document.querySelectorAll('button[type="button"]');
+    for (const btn of emojiButtons) {
+      // 絵文字名を含むボタンを探す
+      const label = btn.getAttribute('aria-label') || btn.textContent || '';
+      if (label.toLowerCase().includes(emojiName.toLowerCase())) {
+        btn.click();
+        await sleep(200);
+        return;
+      }
+    }
+  }
+
+  // ピッカーを閉じる（Escapeキー）
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  await sleep(100);
 }
 
 // 初期化実行

@@ -88,6 +88,12 @@ async function handleMessage(message, sender) {
     case 'REPORT_SELECTOR_FAILURE':
       return await handleSelectorFailure(message.payload);
 
+    case 'POLL_POST_REQUEST':
+      return await handlePollPostRequest(message.payload, sender);
+
+    case 'EMOJI_INSERT_REQUEST':
+      return await handleEmojiInsertRequest(message.payload, sender);
+
     default:
       Logger.warn('Background', '未知のメッセージタイプ', { type: message.type });
       return { success: false, error: 'Unknown message type' };
@@ -267,6 +273,98 @@ async function handleSelectorFailure(payload) {
   // 必要に応じてWorkerに報告することも可能
 
   return { success: true };
+}
+
+/**
+ * アンケート付き投稿リクエスト処理
+ * F-006: アンケート作成機能
+ */
+async function handlePollPostRequest(payload, sender) {
+  Logger.info('Background', 'アンケート付き投稿リクエスト', {
+    textLength: payload.text?.length || 0,
+    optionCount: payload.pollOptions?.length || 0
+  });
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab) {
+      throw new Error('アクティブなタブがありません');
+    }
+
+    if (!tab.url.includes('x.com') && !tab.url.includes('twitter.com')) {
+      throw new Error('Xのページを開いてください');
+    }
+
+    if (!state.selectors) {
+      await fetchAndCacheSelectors();
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'EXECUTE_POST_WITH_POLL',
+      payload: {
+        text: payload.text,
+        pollOptions: payload.pollOptions,
+        pollLength: payload.pollLength,
+        audience: payload.audience,
+        selectors: state.selectors,
+      },
+    });
+
+    if (response.success) {
+      Logger.info('Background', 'アンケート付き投稿成功', {});
+      return { success: true };
+    } else {
+      throw new Error(response.error || 'アンケート付き投稿に失敗しました');
+    }
+
+  } catch (error) {
+    Logger.error('Background', 'アンケート付き投稿処理失敗', { error: error.message });
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * 絵文字挿入リクエスト処理
+ * F-007: 絵文字挿入機能
+ */
+async function handleEmojiInsertRequest(payload, sender) {
+  Logger.info('Background', '絵文字挿入リクエスト', { emoji: payload.emoji });
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab) {
+      throw new Error('アクティブなタブがありません');
+    }
+
+    if (!tab.url.includes('x.com') && !tab.url.includes('twitter.com')) {
+      throw new Error('Xのページを開いてください');
+    }
+
+    if (!state.selectors) {
+      await fetchAndCacheSelectors();
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: 'INSERT_EMOJI',
+      payload: {
+        emoji: payload.emoji,
+        selectors: state.selectors,
+      },
+    });
+
+    if (response.success) {
+      Logger.info('Background', '絵文字挿入成功', {});
+      return { success: true };
+    } else {
+      throw new Error(response.error || '絵文字挿入に失敗しました');
+    }
+
+  } catch (error) {
+    Logger.error('Background', '絵文字挿入処理失敗', { error: error.message });
+    return { success: false, error: error.message };
+  }
 }
 
 /**

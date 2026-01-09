@@ -23,6 +23,18 @@ const elements = {
   statusText: document.getElementById('statusText'),
   connectionDot: document.getElementById('connectionDot'),
   connectionText: document.getElementById('connectionText'),
+  // F-006: アンケート関連
+  pollSection: document.getElementById('pollSection'),
+  pollOption1: document.getElementById('pollOption1'),
+  pollOption2: document.getElementById('pollOption2'),
+  pollOption3: document.getElementById('pollOption3'),
+  pollOption4: document.getElementById('pollOption4'),
+  pollDays: document.getElementById('pollDays'),
+  pollHours: document.getElementById('pollHours'),
+  btnRemovePoll: document.getElementById('btnRemovePoll'),
+  // F-007: 絵文字関連
+  emojiPicker: document.getElementById('emojiPicker'),
+  emojiGrid: document.getElementById('emojiGrid'),
 };
 
 // 状態
@@ -32,6 +44,10 @@ const state = {
   currentTab: null,
   mediaFiles: [], // 添付メディアファイル
   threadTexts: [], // ツリー投稿のテキスト配列
+  // F-006: アンケート状態
+  isPollEnabled: false,
+  // F-007: 絵文字ピッカー状態
+  isEmojiPickerOpen: false,
 };
 
 /**
@@ -70,11 +86,17 @@ function setupEventListeners() {
   // ツリー追加
   elements.btnAddThread.addEventListener('click', addThreadItem);
 
-  // オプションボタン（今後実装予定）
+  // オプションボタン
   elements.btnGif.addEventListener('click', () => showNotImplemented('GIF添付'));
-  elements.btnPoll.addEventListener('click', () => showNotImplemented('アンケート'));
-  elements.btnEmoji.addEventListener('click', () => showNotImplemented('絵文字'));
-  elements.btnSchedule.addEventListener('click', () => showNotImplemented('予約投稿'));
+  elements.btnSchedule.addEventListener('click', () => showNotImplemented('予約投稿（Premiumが必要）'));
+
+  // F-006: アンケート機能
+  elements.btnPoll.addEventListener('click', togglePoll);
+  elements.btnRemovePoll.addEventListener('click', removePoll);
+
+  // F-007: 絵文字機能
+  elements.btnEmoji.addEventListener('click', toggleEmojiPicker);
+  setupEmojiButtons();
 }
 
 /**
@@ -120,8 +142,19 @@ async function handlePost() {
 
   const mainText = elements.postText.value.trim();
   const hasThread = state.threadTexts.length > 0;
+  const hasPoll = state.isPollEnabled;
 
   if (!mainText && state.mediaFiles.length === 0) return;
+
+  // アンケート付き投稿のバリデーション
+  if (hasPoll) {
+    const pollOptions = getPollOptions();
+    if (pollOptions.length < 2) {
+      setStatus('error', 'アンケートには最低2つの選択肢が必要です');
+      setTimeout(() => setStatus('ready', '準備完了'), 2000);
+      return;
+    }
+  }
 
   // ツリー投稿のテキストを収集
   const threadTexts = hasThread
@@ -131,24 +164,51 @@ async function handlePost() {
   XPostAgentLogger.info('Popup', '投稿開始', {
     textLength: mainText.length,
     mediaCount: state.mediaFiles.length,
-    threadCount: threadTexts?.length || 0
+    threadCount: threadTexts?.length || 0,
+    hasPoll,
   });
 
   try {
     state.isProcessing = true;
-    setStatus('processing', hasThread ? 'ツリー投稿中...' : '投稿中...');
+    const statusMsg = hasPoll ? 'アンケート投稿中...' : (hasThread ? 'ツリー投稿中...' : '投稿中...');
+    setStatus('processing', statusMsg);
     elements.btnPost.disabled = true;
 
-    // Background Scriptに投稿リクエストを送信
-    const response = await chrome.runtime.sendMessage({
-      type: hasThread ? 'THREAD_POST_REQUEST' : 'POST_REQUEST',
-      payload: {
-        text: mainText,
-        threadTexts,
-        audience: elements.audience.value,
-        mediaFiles: state.mediaFiles,
-      },
-    });
+    let response;
+
+    if (hasPoll) {
+      // F-006: アンケート付き投稿
+      response = await chrome.runtime.sendMessage({
+        type: 'POLL_POST_REQUEST',
+        payload: {
+          text: mainText,
+          pollOptions: getPollOptions(),
+          pollLength: getPollLength(),
+          audience: elements.audience.value,
+        },
+      });
+    } else if (hasThread) {
+      // ツリー投稿
+      response = await chrome.runtime.sendMessage({
+        type: 'THREAD_POST_REQUEST',
+        payload: {
+          text: mainText,
+          threadTexts,
+          audience: elements.audience.value,
+          mediaFiles: state.mediaFiles,
+        },
+      });
+    } else {
+      // 通常投稿
+      response = await chrome.runtime.sendMessage({
+        type: 'POST_REQUEST',
+        payload: {
+          text: mainText,
+          audience: elements.audience.value,
+          mediaFiles: state.mediaFiles,
+        },
+      });
+    }
 
     if (response.success) {
       XPostAgentLogger.info('Popup', '投稿完了');
@@ -156,6 +216,7 @@ async function handlePost() {
       elements.postText.value = '';
       clearMedia();
       clearThread();
+      if (hasPoll) removePoll();
       handleTextInput(); // 文字数リセット
     } else {
       throw new Error(response.error || '投稿に失敗しました');
@@ -421,6 +482,140 @@ function updatePostButtonText() {
   elements.btnPost.textContent = hasThread
     ? `${state.threadTexts.length + 1}件を投稿`
     : '投稿する';
+}
+
+// ========================================
+// F-006: アンケート機能
+// ========================================
+
+/**
+ * アンケート表示/非表示を切り替え
+ */
+function togglePoll() {
+  state.isPollEnabled = !state.isPollEnabled;
+
+  if (state.isPollEnabled) {
+    elements.pollSection.style.display = 'block';
+    elements.btnPoll.classList.add('active');
+    // メディアとアンケートは同時に使用不可（X仕様）
+    if (state.mediaFiles.length > 0) {
+      clearMedia();
+      setStatus('ready', 'アンケート使用時は画像添付できません');
+    }
+    // ツリーとアンケートは同時に使用不可
+    if (state.threadTexts.length > 0) {
+      clearThread();
+      setStatus('ready', 'アンケート使用時はツリー投稿できません');
+    }
+    XPostAgentLogger.info('Popup', 'アンケート有効化');
+  } else {
+    removePoll();
+  }
+
+  updatePostButton();
+}
+
+/**
+ * アンケートを削除
+ */
+function removePoll() {
+  state.isPollEnabled = false;
+  elements.pollSection.style.display = 'none';
+  elements.btnPoll.classList.remove('active');
+  // 入力をクリア
+  elements.pollOption1.value = '';
+  elements.pollOption2.value = '';
+  elements.pollOption3.value = '';
+  elements.pollOption4.value = '';
+  elements.pollDays.value = '1';
+  elements.pollHours.value = '0';
+  XPostAgentLogger.info('Popup', 'アンケート削除');
+  updatePostButton();
+}
+
+/**
+ * アンケートオプションを取得
+ */
+function getPollOptions() {
+  const options = [
+    elements.pollOption1.value.trim(),
+    elements.pollOption2.value.trim(),
+    elements.pollOption3.value.trim(),
+    elements.pollOption4.value.trim(),
+  ].filter(opt => opt.length > 0);
+  return options;
+}
+
+/**
+ * アンケート期間を取得（分単位）
+ */
+function getPollLength() {
+  const days = parseInt(elements.pollDays.value) || 1;
+  const hours = parseInt(elements.pollHours.value) || 0;
+  return {
+    days,
+    hours,
+    minutes: 0,
+    totalMinutes: (days * 24 * 60) + (hours * 60),
+  };
+}
+
+// ========================================
+// F-007: 絵文字機能
+// ========================================
+
+/**
+ * 絵文字ピッカー表示/非表示を切り替え
+ */
+function toggleEmojiPicker() {
+  state.isEmojiPickerOpen = !state.isEmojiPickerOpen;
+
+  if (state.isEmojiPickerOpen) {
+    elements.emojiPicker.style.display = 'block';
+    elements.btnEmoji.classList.add('active');
+  } else {
+    elements.emojiPicker.style.display = 'none';
+    elements.btnEmoji.classList.remove('active');
+  }
+}
+
+/**
+ * 絵文字ボタンのイベント設定
+ */
+function setupEmojiButtons() {
+  const emojiButtons = elements.emojiGrid.querySelectorAll('.emoji-btn');
+  emojiButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const emoji = btn.getAttribute('data-emoji');
+      insertEmojiToText(emoji);
+    });
+  });
+}
+
+/**
+ * テキストエリアに絵文字を挿入
+ */
+function insertEmojiToText(emoji) {
+  const textarea = elements.postText;
+  const start = textarea.selectionStart;
+  const end = textarea.selectionEnd;
+  const text = textarea.value;
+
+  // カーソル位置に挿入
+  textarea.value = text.substring(0, start) + emoji + text.substring(end);
+
+  // カーソルを絵文字の後ろに移動
+  const newPos = start + emoji.length;
+  textarea.setSelectionRange(newPos, newPos);
+  textarea.focus();
+
+  // 文字数カウント更新
+  handleTextInput();
+
+  // ピッカーを閉じる
+  toggleEmojiPicker();
+
+  XPostAgentLogger.debug('Popup', '絵文字挿入', { emoji });
 }
 
 // 初期化実行
